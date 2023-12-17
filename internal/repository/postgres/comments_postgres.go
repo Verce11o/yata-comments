@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	paginationLimit = 2
+	paginationLimit = 10
 )
 
 type CommentsPostgres struct {
@@ -25,13 +25,13 @@ func NewCommentsPostgres(db *sqlx.DB, tracer trace.Tracer) *CommentsPostgres {
 	return &CommentsPostgres{db: db, tracer: tracer}
 }
 
-func (c *CommentsPostgres) CreateComment(ctx context.Context, input *pb.CreateCommentRequest, imageName string, imageURL string) (string, error) {
+func (c *CommentsPostgres) CreateComment(ctx context.Context, input *pb.CreateCommentRequest, imageName string) (string, error) {
 	ctx, span := c.tracer.Start(ctx, "commentPostgres.CreateTweet")
 	defer span.End()
 
 	var commentID string
 
-	q := "INSERT INTO comments (tweet_id, user_id, text, image_name, image_temp_url) VALUES ($1, $2, $3, $4, $5) RETURNING comment_id"
+	q := "INSERT INTO comments (tweet_id, user_id, text, image_name) VALUES ($1, $2, $3, $4) RETURNING comment_id"
 
 	stmt, err := c.db.PreparexContext(ctx, q)
 
@@ -39,7 +39,7 @@ func (c *CommentsPostgres) CreateComment(ctx context.Context, input *pb.CreateCo
 		return "", err
 	}
 
-	err = stmt.QueryRowxContext(ctx, input.GetTweetId(), input.GetUserId(), input.GetText(), imageName, imageURL).Scan(&commentID)
+	err = stmt.QueryRowxContext(ctx, input.GetTweetId(), input.GetUserId(), input.GetText(), imageName).Scan(&commentID)
 
 	if err != nil {
 		return "", err
@@ -103,7 +103,6 @@ func (c *CommentsPostgres) GetAllTweetComments(ctx context.Context, cursor strin
 			UserId:    item.UserID.String(),
 			CommentId: item.CommentID.String(),
 			Text:      item.Text,
-			ImageUrl:  &item.ImageURL,
 		})
 		latestCreatedAt = item.CreatedAt
 	}
@@ -116,15 +115,15 @@ func (c *CommentsPostgres) GetAllTweetComments(ctx context.Context, cursor strin
 	return comments, nextCursor, nil
 }
 
-func (c *CommentsPostgres) UpdateComment(ctx context.Context, input *pb.UpdateCommentRequest, imageName string, imageURL string) (*domain.Comment, error) {
+func (c *CommentsPostgres) UpdateComment(ctx context.Context, input *pb.UpdateCommentRequest, imageName string) (*domain.Comment, error) {
 	ctx, span := c.tracer.Start(ctx, "commentPostgres.Updatecomment")
 	defer span.End()
 
 	var comment domain.Comment
 
-	q := "UPDATE comments SET text = $1, image_name = $2, image_temp_url = $3, updated_at = CURRENT_TIMESTAMP WHERE comment_id = $4 RETURNING *"
+	q := "UPDATE comments SET text = $1, image_name = $2, updated_at = CURRENT_TIMESTAMP WHERE comment_id = $3 RETURNING *"
 
-	if err := c.db.QueryRowxContext(ctx, q, input.GetText(), imageName, imageURL, input.GetCommentId()).StructScan(&comment); err != nil {
+	if err := c.db.QueryRowxContext(ctx, q, input.GetText(), imageName, input.GetCommentId()).StructScan(&comment); err != nil {
 		return nil, err
 	}
 

@@ -52,7 +52,6 @@ func (c *CommentGRPC) GetComment(ctx context.Context, input *pb.GetCommentReques
 		UserId:    comment.UserID.String(),
 		CommentId: comment.CommentID.String(),
 		Text:      comment.Text,
-		ImageUrl:  &comment.ImageURL,
 	}, nil
 }
 
@@ -86,7 +85,6 @@ func (c *CommentGRPC) UpdateComment(ctx context.Context, input *pb.UpdateComment
 		UserId:    comment.UserID.String(),
 		CommentId: comment.CommentID.String(),
 		Text:      comment.Text,
-		ImageUrl:  &comment.ImageURL,
 	}, nil
 }
 

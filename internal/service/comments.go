@@ -28,12 +28,9 @@ func (t *Comment) CreateComment(ctx context.Context, input *pb.CreateCommentRequ
 
 	image := input.GetImage()
 
-	var imageUrl string
-	var err error
-
 	if image != nil {
 
-		imageUrl, err = t.minio.AddCommentImage(ctx, image, image.GetName())
+		err := t.minio.AddCommentImage(ctx, image, image.GetName())
 
 		if err != nil {
 			t.log.Errorf("cannot add image to comment in minio: %v", err.Error())
@@ -41,7 +38,7 @@ func (t *Comment) CreateComment(ctx context.Context, input *pb.CreateCommentRequ
 
 	}
 
-	commentID, err := t.repo.CreateComment(ctx, input, image.GetName(), imageUrl)
+	commentID, err := t.repo.CreateComment(ctx, input, image.GetName())
 
 	if err != nil {
 		return "", err
@@ -80,24 +77,11 @@ func (t *Comment) GetComment(ctx context.Context, commentID string) (domain.Comm
 
 }
 
-func (t *Comment) GetCommentImage(ctx context.Context, imageName string) (string, error) {
-	ctx, span := t.tracer.Start(ctx, "commentService.GetCommentImage")
-	defer span.End()
-
-	imageURL, err := t.minio.GetCommentImage(ctx, imageName)
-
-	if err != nil {
-		t.log.Errorf("cannot get comment image by id in minio: %v", err.Error())
-		return "", err
-	}
-
-	return imageURL, nil
-
-}
-
 func (t *Comment) GetAllTweetComments(ctx context.Context, input *pb.GetAllTweetCommentsRequest) ([]*pb.Comment, string, error) {
 	ctx, span := t.tracer.Start(ctx, "commentService.GetAllComments")
 	defer span.End()
+
+	t.log.Debugf("")
 
 	comments, nextCursor, err := t.repo.GetAllTweetComments(ctx, input.GetCursor(), input.GetTweetId())
 
@@ -129,7 +113,13 @@ func (t *Comment) UpdateComment(ctx context.Context, input *pb.UpdateCommentRequ
 	newImageName := comment.ImageName
 
 	if image != nil { // if input image is not nil, we need to update it
-		err = t.minio.UpdateCommentImage(ctx, comment.ImageName, image.GetName(), image)
+		var err error
+
+		if comment.ImageName == "" {
+			err = t.minio.AddCommentImage(ctx, image, image.GetName())
+		} else {
+			err = t.minio.UpdateCommentImage(ctx, comment.ImageName, image.GetName(), image)
+		}
 
 		if err != nil {
 			t.log.Errorf("cannot update comment image: %v", err.Error())
@@ -139,14 +129,7 @@ func (t *Comment) UpdateComment(ctx context.Context, input *pb.UpdateCommentRequ
 		newImageName = image.GetName()
 	}
 
-	imageURL, err := t.minio.GetCommentImage(ctx, newImageName)
-
-	if err != nil {
-		t.log.Errorf("cannot get image url: %v", err.Error())
-		return nil, err
-	}
-
-	newComment, err := t.repo.UpdateComment(ctx, input, newImageName, imageURL)
+	newComment, err := t.repo.UpdateComment(ctx, input, newImageName)
 
 	if err != nil {
 		t.log.Errorf("cannot update comment: %v", err.Error())
@@ -185,6 +168,13 @@ func (t *Comment) DeleteComment(ctx context.Context, input *pb.DeleteCommentRequ
 
 	if err := t.redis.DeleteCommentByIDCtx(ctx, comment.CommentID.String()); err != nil {
 		t.log.Errorf("cannot delete comment by id in redis: %v", err.Error())
+	}
+
+	err = t.minio.DeleteFile(ctx, comment.ImageName)
+
+	if err != nil {
+		t.log.Errorf("cannot delete comment image by id: %v", err.Error())
+		return err
 	}
 
 	return nil

@@ -6,7 +6,6 @@ import (
 	pb "github.com/Verce11o/yata-protos/gen/go/comments"
 	"github.com/minio/minio-go/v7"
 	"go.opentelemetry.io/otel/trace"
-	"net/url"
 	"time"
 )
 
@@ -24,7 +23,7 @@ func NewCommentMinio(minio *minio.Client, tracer trace.Tracer) *CommentMinio {
 	return &CommentMinio{minio: minio, tracer: tracer}
 }
 
-func (t *CommentMinio) AddCommentImage(ctx context.Context, image *pb.Image, fileName string) (string, error) {
+func (t *CommentMinio) AddCommentImage(ctx context.Context, image *pb.Image, fileName string) error {
 	ctx, span := t.tracer.Start(ctx, "commentMinio.AddImage")
 	defer span.End()
 
@@ -39,30 +38,10 @@ func (t *CommentMinio) AddCommentImage(ctx context.Context, image *pb.Image, fil
 		minio.PutObjectOptions{ContentType: image.GetContentType()},
 	)
 	if err != nil {
-		return "", err
+		return err
 	}
 
-	u, err := t.minio.PresignedGetObject(ctx, userCommentsName, fileName, imageExpireTime, url.Values{})
-
-	if err != nil {
-		return "", err
-	}
-
-	return u.String(), nil
-}
-
-// GetCommentImage returns image url on minio
-func (t *CommentMinio) GetCommentImage(ctx context.Context, fileName string) (string, error) {
-	ctx, span := t.tracer.Start(ctx, "commentMinio.GetImage")
-	defer span.End()
-
-	u, err := t.minio.PresignedGetObject(ctx, userCommentsName, fileName, imageExpireTime, url.Values{})
-
-	if err != nil {
-		return "", err
-	}
-
-	return u.String(), nil
+	return nil
 }
 
 func (t *CommentMinio) UpdateCommentImage(ctx context.Context, oldName string, newName string, image *pb.Image) error {
@@ -75,7 +54,8 @@ func (t *CommentMinio) UpdateCommentImage(ctx context.Context, oldName string, n
 		return err
 	}
 
-	_, err = t.AddCommentImage(ctx, image, newName)
+	err = t.AddCommentImage(ctx, image, newName)
+
 	if err != nil {
 		return err
 	}
