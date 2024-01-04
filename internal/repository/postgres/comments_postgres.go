@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"time"
 )
 
@@ -103,6 +104,7 @@ func (c *CommentsPostgres) GetAllTweetComments(ctx context.Context, cursor strin
 			UserId:    item.UserID.String(),
 			CommentId: item.CommentID.String(),
 			Text:      item.Text,
+			CreatedAt: timestamppb.New(item.CreatedAt),
 		})
 		latestCreatedAt = item.CreatedAt
 	}

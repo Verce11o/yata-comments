@@ -3,7 +3,7 @@ module github.com/Verce11o/yata-comments
 go 1.21.3
 
 require (
-	github.com/Verce11o/yata-protos v0.0.0-20231216144427-ff1ac2cb559f
+	github.com/Verce11o/yata-protos v0.0.0-20240104093233-bc82943e6a37
 	github.com/google/uuid v1.5.0
 	github.com/ilyakaznacheev/cleanenv v1.5.0
 	github.com/jmoiron/sqlx v1.3.5
